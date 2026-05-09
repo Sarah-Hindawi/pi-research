@@ -1,7 +1,6 @@
 """
 Official legislature URLs for all 50 states + DC.
 These are the authoritative source URLs used for scraping and citation.
-Owner: Sarah / Agent scraper
 
 Each entry has:
     name:         full state name

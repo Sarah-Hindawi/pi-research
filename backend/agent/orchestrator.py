@@ -1,6 +1,5 @@
 """
 LangGraph agent — statute research orchestrator.
-Owner: Jeffery
 
 Steps:
 1. Parse query → identify intent + extract state/factor filters
@@ -15,7 +14,7 @@ from langgraph.graph.message import add_messages
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from llm_client import get_llm
-from retrieval.vector_store import search, get_by_factor, get_by_citation, list_states
+from rag.retrieval.store import search, get_by_factor, get_by_citation, list_states
 from prompts.templates import (
     AGENT_SYSTEM_PROMPT,
     STATUTE_LOOKUP_PROMPT,

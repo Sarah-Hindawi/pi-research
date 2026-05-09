@@ -1,6 +1,5 @@
 """
 Coverage gap detector — shows which states and factors are thin.
-Owner: Sushumma / Yingkai
 
 Usage:
     python -m ingestion.coverage_gap

@@ -1,6 +1,5 @@
 """
 Citation normalizer — handles malformed/partial citations.
-Owner: Yingkai
 
 Normalizes inputs like:
     CVC 21451          → Cal. Veh. Code § 21451

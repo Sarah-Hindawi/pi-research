@@ -1,17 +1,13 @@
 """
-Contributing factor classifier — structured JSON output.
-Owner: Yingkai
+classifier.py — Auto-classifies statutes into 17 contributing factor categories.
 
-Classifies every statute into the 17 contributing factor categories.
-Returns structured JSON with confidence, trigger phrases, and reasoning.
-
-Usage:
-    from ingestion.classifier import classify_statute, classify_batch
+Moved here from ingestion/ — this is part of your embedding pipeline,
+not the scraping pipeline.
 """
 import json
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from llm_client import get_llm
 
 CONTRIBUTING_FACTORS = [
@@ -42,21 +38,18 @@ Categories:
 Statute text:
 {statute_text}
 
-Return ONLY valid JSON — no markdown, no explanation:
+Return ONLY valid JSON — no markdown:
 {{
   "primary_factor": "<exact category name>",
-  "secondary_factors": ["<optional additional categories>"],
+  "secondary_factors": ["<optional>"],
   "confidence": <0.0-1.0>,
-  "trigger_phrases": ["<key phrases from statute that indicate the category>"],
-  "reason": "<one sentence explaining the classification>"
+  "trigger_phrases": ["<key phrases from statute>"],
+  "reason": "<one sentence>"
 }}"""
 
 
 def classify_statute(statute_text: str) -> dict:
-    """
-    Classify a statute into contributing factor categories.
-    Returns structured dict with primary_factor, confidence, trigger_phrases, reason.
-    """
+    """Classify a single statute. Returns structured dict."""
     llm = get_llm()
     prompt = CLASSIFY_PROMPT.format(
         categories="\n".join(f"- {f}" for f in CONTRIBUTING_FACTORS),
@@ -67,7 +60,7 @@ def classify_statute(statute_text: str) -> dict:
         clean = response.strip().removeprefix("```json").removesuffix("```").strip()
         result = json.loads(clean)
 
-        # Validate primary factor
+        # Validate
         if result.get("primary_factor") not in CONTRIBUTING_FACTORS:
             for f in CONTRIBUTING_FACTORS:
                 if f.lower() == result.get("primary_factor", "").lower():
@@ -75,32 +68,26 @@ def classify_statute(statute_text: str) -> dict:
                     break
             else:
                 result["primary_factor"] = "Other"
-
         return result
     except Exception as e:
         return {
-            "primary_factor": "Other",
+            "primary_factor":    "Other",
             "secondary_factors": [],
-            "confidence": 0.0,
-            "trigger_phrases": [],
-            "reason": f"Classification failed: {e}",
+            "confidence":        0.0,
+            "trigger_phrases":   [],
+            "reason":            f"Failed: {e}",
         }
 
 
 def classify_batch(statutes: list[dict]) -> list[dict]:
-    """
-    Classify a list of statute dicts in place.
-    Adds contributing_factor + structured metadata to each.
-    """
+    """Classify all statutes missing a contributing_factor."""
     for s in statutes:
         if s["metadata"].get("contributing_factor"):
-            continue  # already classified (e.g. from seed CSV)
-
+            continue
         result = classify_statute(s["text"])
         s["metadata"]["contributing_factor"] = result["primary_factor"]
-        s["metadata"]["secondary_factors"] = json.dumps(result.get("secondary_factors", []))
-        s["metadata"]["confidence"] = result.get("confidence", 0.0)
-        s["metadata"]["trigger_phrases"] = json.dumps(result.get("trigger_phrases", []))
-        print(f"  → {s['metadata'].get('section','?')} [{s['metadata'].get('state','?')}]: {result['primary_factor']} ({result.get('confidence',0):.0%})")
-
+        s["metadata"]["confidence"]          = result.get("confidence", 0.0)
+        s["metadata"]["trigger_phrases"]     = json.dumps(result.get("trigger_phrases", []))
+        print(f"  → [{s['metadata'].get('state','?')}] {s['metadata'].get('section','?')}: "
+              f"{result['primary_factor']} ({result.get('confidence', 0):.0%})")
     return statutes

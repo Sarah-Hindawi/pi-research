@@ -1,6 +1,5 @@
 """
 Seed loader — ingests the eval-ca-vehicle-code.csv directly into ChromaDB.
-Owner: Sarah
 
 Run first before any scraper. Guarantees all 41 CA statutes are in the DB
 with correct contributing factor labels and source URLs.

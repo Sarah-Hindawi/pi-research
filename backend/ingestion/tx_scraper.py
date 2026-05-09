@@ -1,6 +1,5 @@
 """
 Texas Transportation Code scraper.
-Owner: Sarah
 
 Source: https://statutes.capitol.texas.gov
 Equivalent to CA Vehicle Code for Texas.

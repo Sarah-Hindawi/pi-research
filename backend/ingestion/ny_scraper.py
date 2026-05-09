@@ -1,6 +1,5 @@
 """
 New York Vehicle & Traffic Law scraper.
-Owner: Sarah
 
 Source: https://legislation.nysenate.gov/api/3/statutes/
 NY has a public API — no scraping needed, just JSON calls.

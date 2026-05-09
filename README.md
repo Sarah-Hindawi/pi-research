@@ -85,14 +85,14 @@ See `.env.example` for all vars. Key ones:
 openclaw/
 ├── backend/
 │   ├── api/              # FastAPI routes
-│   ├── agent/            # LangGraph agent (Jeffery)
-│   ├── ingestion/        # CanLII scraper + PDF extractor (Sarah + Sushumma)
-│   ├── retrieval/        # ChromaDB wrapper + embedding (Yingkai)
-│   ├── prompts/          # All LLM prompts (Yingkai)
+│   ├── agent/            # LangGraph agent
+│   ├── ingestion/        # CanLII scraper + PDF extractor
+│   ├── retrieval/        # ChromaDB wrapper + embedding
+│   ├── prompts/          # All LLM prompts
 │   ├── db/               # SQLite chat history
 │   ├── evals/            # RAGAS + LLM-as-judge stubs
 │   └── requirements.txt
-├── frontend/             # React app (CC)
+├── frontend/             # React app
 │   └── src/
 │       ├── components/
 │       ├── hooks/

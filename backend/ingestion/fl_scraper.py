@@ -1,6 +1,5 @@
 """
 Florida Statutes scraper — Title XXIII (Motor Vehicles).
-Owner: Sarah
 
 Source: https://www.flsenate.gov/Laws/Statutes/
 Chapter 316 = State Uniform Traffic Control (main PI chapter)

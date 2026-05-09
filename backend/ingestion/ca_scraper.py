@@ -1,6 +1,5 @@
 """
 California Vehicle Code scraper.
-Owner: Sarah
 
 Source: https://leginfo.legislature.ca.gov
 Scrapes Division 11 (Rules of Road) — most PI-relevant sections.

@@ -1,5 +1,4 @@
-# RAG Output Format — Contract for Evals Team
-# Sushumma can use this to build evals without waiting for the full pipeline
+# RAG Output Format
 
 # ── What POST /chat returns ────────────────────────────────────────────────
 

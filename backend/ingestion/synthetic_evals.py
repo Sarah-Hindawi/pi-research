@@ -1,6 +1,5 @@
 """
 Synthetic eval generator.
-Owner: Sushumma
 
 Generates multi-state query variants from the 41 CA released rows.
 Used for self-evaluation before judges test with the held-out set.

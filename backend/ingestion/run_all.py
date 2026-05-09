@@ -1,6 +1,5 @@
 """
 Master ingestion pipeline.
-Owner: Sarah
 
 Usage:
     python -m ingestion.run_all              # full pipeline

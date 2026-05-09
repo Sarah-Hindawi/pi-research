@@ -1,6 +1,5 @@
 """
 Agentic multi-state vehicle code scraper.
-Owner: Jeffery / Sarah
 
 Uses Claude to:
 1. Discover the correct URL for each state's vehicle code section

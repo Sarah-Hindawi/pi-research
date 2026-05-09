@@ -1,6 +1,5 @@
 """
 All LLM prompts for the statute harvester.
-Owner: Yingkai
 """
 
 # ── Contributing factor categories ────────────────────────────────────────
