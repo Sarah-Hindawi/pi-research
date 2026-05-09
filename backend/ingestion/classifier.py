@@ -1,17 +1,19 @@
 """
-Auto-classifier — assigns contributing factor labels to scraped statutes
-using Claude (or placeholder). Used by all state scrapers.
-Owner: Sarah / Yingkai
+Contributing factor classifier — structured JSON output.
+Owner: Yingkai
+
+Classifies every statute into the 17 contributing factor categories.
+Returns structured JSON with confidence, trigger phrases, and reasoning.
 
 Usage:
-    from ingestion.classifier import classify_statute
-    factor = classify_statute("no person shall drive under the influence...")
+    from ingestion.classifier import classify_statute, classify_batch
 """
-import sys, os
+import json
+import sys
+import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from llm_client import get_llm
 
-# The 17 official contributing factor categories from the eval
 CONTRIBUTING_FACTORS = [
     "DUI/DWI",
     "Failure to Maintain Lane",
@@ -32,23 +34,28 @@ CONTRIBUTING_FACTORS = [
     "Other",
 ]
 
-CLASSIFY_PROMPT = """You are a legal classification assistant.
+CLASSIFY_PROMPT = """Classify this vehicle code statute into contributing factor categories.
 
-Given a vehicle code statute, classify it into exactly one of these 17 contributing factor categories:
-
+Categories:
 {categories}
 
 Statute text:
 {statute_text}
 
-Reply with ONLY the category name, exactly as written above. No explanation."""
+Return ONLY valid JSON — no markdown, no explanation:
+{{
+  "primary_factor": "<exact category name>",
+  "secondary_factors": ["<optional additional categories>"],
+  "confidence": <0.0-1.0>,
+  "trigger_phrases": ["<key phrases from statute that indicate the category>"],
+  "reason": "<one sentence explaining the classification>"
+}}"""
 
 
-def classify_statute(statute_text: str) -> str:
+def classify_statute(statute_text: str) -> dict:
     """
-    Classify a statute into one of the 17 contributing factor categories.
-    Returns the category name string.
-    Falls back to "Other" if classification fails.
+    Classify a statute into contributing factor categories.
+    Returns structured dict with primary_factor, confidence, trigger_phrases, reason.
     """
     llm = get_llm()
     prompt = CLASSIFY_PROMPT.format(
@@ -57,30 +64,43 @@ def classify_statute(statute_text: str) -> str:
     )
     try:
         response = llm.invoke([{"role": "user", "content": prompt}])
-        # Clean up response
-        result = response.strip().strip('"').strip("'")
-        # Validate it's one of our categories
-        if result in CONTRIBUTING_FACTORS:
-            return result
-        # Try case-insensitive match
-        for factor in CONTRIBUTING_FACTORS:
-            if factor.lower() == result.lower():
-                return factor
-        return "Other"
+        clean = response.strip().removeprefix("```json").removesuffix("```").strip()
+        result = json.loads(clean)
+
+        # Validate primary factor
+        if result.get("primary_factor") not in CONTRIBUTING_FACTORS:
+            for f in CONTRIBUTING_FACTORS:
+                if f.lower() == result.get("primary_factor", "").lower():
+                    result["primary_factor"] = f
+                    break
+            else:
+                result["primary_factor"] = "Other"
+
+        return result
     except Exception as e:
-        print(f"  [classifier] error: {e}")
-        return "Other"
+        return {
+            "primary_factor": "Other",
+            "secondary_factors": [],
+            "confidence": 0.0,
+            "trigger_phrases": [],
+            "reason": f"Classification failed: {e}",
+        }
 
 
 def classify_batch(statutes: list[dict]) -> list[dict]:
     """
     Classify a list of statute dicts in place.
-    Each dict must have a 'text' key.
-    Adds 'contributing_factor' to metadata.
+    Adds contributing_factor + structured metadata to each.
     """
     for s in statutes:
-        if not s["metadata"].get("contributing_factor"):
-            factor = classify_statute(s["text"])
-            s["metadata"]["contributing_factor"] = factor
-            print(f"  → {s['metadata'].get('section', '?')} classified as: {factor}")
+        if s["metadata"].get("contributing_factor"):
+            continue  # already classified (e.g. from seed CSV)
+
+        result = classify_statute(s["text"])
+        s["metadata"]["contributing_factor"] = result["primary_factor"]
+        s["metadata"]["secondary_factors"] = json.dumps(result.get("secondary_factors", []))
+        s["metadata"]["confidence"] = result.get("confidence", 0.0)
+        s["metadata"]["trigger_phrases"] = json.dumps(result.get("trigger_phrases", []))
+        print(f"  → {s['metadata'].get('section','?')} [{s['metadata'].get('state','?')}]: {result['primary_factor']} ({result.get('confidence',0):.0%})")
+
     return statutes
