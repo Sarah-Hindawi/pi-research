@@ -103,5 +103,9 @@ Question: {query}
 Relevant statutes:
 {statutes}
 
-Answer the question directly with citations. Include source URLs.
-If the question cannot be answered from the available statutes, say so."""
+Answer the question directly. For each statute include:
+- Full citation (e.g. Cal. Veh. Code § 22350)
+- Relevant statutory language
+- Source URL
+
+If the question cannot be answered from the available statutes, say so clearly."""
