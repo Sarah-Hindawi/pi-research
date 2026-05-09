@@ -62,6 +62,7 @@ class EvalResult(BaseModel):
     relevance:     DimensionScore
     completeness:  DimensionScore
     overall_score: float
+    confidence:    float    # how certain the judge is about this evaluation, 0.0 – 1.0
     verdict:       Literal["pass", "fail", "partial"]
     summary:       str
 
@@ -79,12 +80,19 @@ Scoring rules:
 - Be strict: a cited statute that is tangentially related scores no higher than 0.5.
 - Base your judgment only on what is provided — do not hallucinate case law.
 
+Confidence score (0.0 – 1.0):
+- Reflects how certain you are about your own evaluation, not the quality of the answer.
+- High (0.8–1.0): case facts are clear, statutes are unambiguous, ground truth is available.
+- Medium (0.5–0.7): some facts are vague, statutes are borderline applicable, or ground truth is missing.
+- Low (0.0–0.4): case is highly ambiguous, insufficient context to judge reliably.
+
 Return ONLY valid JSON matching this schema exactly:
 {
   "correctness":   { "score": <float>, "reasoning": "<string>" },
   "faithfulness":  { "score": <float>, "reasoning": "<string>" },
   "relevance":     { "score": <float>, "reasoning": "<string>" },
   "completeness":  { "score": <float>, "reasoning": "<string>" },
+  "confidence":    <float>,
   "summary": "<one sentence verdict>"
 }
 """
@@ -216,6 +224,7 @@ def evaluate(req: EvalRequest, db=None) -> EvalResult:
         relevance=DimensionScore(**data["relevance"]),
         completeness=DimensionScore(**data["completeness"]),
         overall_score=overall,
+        confidence=round(float(data.get("confidence", 0.5)), 2),
         verdict=_verdict(overall),
         summary=data.get("summary", ""),
     )
@@ -230,6 +239,7 @@ def evaluate_batch(requests: list[EvalRequest], db=None) -> dict:
             "query":         req.query,
             "verdict":       result.verdict,
             "overall_score": result.overall_score,
+            "confidence":    result.confidence,
             "correctness":   result.correctness.score,
             "faithfulness":  result.faithfulness.score,
             "relevance":     result.relevance.score,
@@ -309,6 +319,7 @@ def evaluate_response(
             "relevance":    result.relevance.score,
             "completeness": result.completeness.score,
             "overall":      result.overall_score,
+            "confidence":   result.confidence,
             "verdict":      result.verdict,
             "reasoning":    result.summary,
         },
