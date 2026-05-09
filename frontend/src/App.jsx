@@ -414,25 +414,25 @@ function LeftPanel({ input, setInput, onSend, loading, onExample, sessions, sess
             <div className="p-6 text-[13px] text-primary-tertiary text-center">No sessions yet</div>
           ) : (
             sessions.map(sess => (
-              <div
-                key={sess.session_id}
-                onClick={() => onLoadSession(sess.session_id)}
-                className={`flex items-center justify-between px-5 py-3.5 cursor-pointer border-b border-border-faint last:border-0 hover:bg-bg transition-colors group ${sess.session_id === sessionId ? 'bg-accent-blue-soft' : ''}`}
-              >
-                <div className="min-w-0">
-                  <div className="text-[13px] text-primary truncate font-medium">{sess.label || 'Research session'}</div>
-                  <div className="text-[11px] text-primary-tertiary mt-0.5">
-                    {sess.last_activity ? new Date(sess.last_activity).toLocaleDateString() : ''}
-                  </div>
+            <div
+              key={sess.id}
+              onClick={() => onLoadSession(sess.id)}
+              className={`flex items-center justify-between px-5 py-3.5 cursor-pointer border-b border-border-faint last:border-0 hover:bg-bg transition-colors group ${sess.id === sessionId ? 'bg-accent-blue-soft' : ''}`}
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] text-primary truncate font-medium">{sess.label || 'Research session'}</div>
+                <div className="text-[11px] text-primary-tertiary mt-0.5">
+                  {sess.last_activity ? new Date(sess.last_activity).toLocaleDateString() : ''}
                 </div>
-                <button
-                  onClick={e => onDeleteSession(sess.session_id, e)}
-                  className="opacity-0 group-hover:opacity-100 text-primary-tertiary hover:text-warning transition-all ml-2 flex-shrink-0"
-                >
-                  <TrashIcon />
-                </button>
               </div>
-            ))
+              <button
+                onClick={e => onDeleteSession(sess.id, e)}
+                className="opacity-0 group-hover:opacity-100 text-primary-tertiary hover:text-warning transition-all ml-2 flex-shrink-0"
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          ))
           )}
         </div>
       </div>
@@ -837,7 +837,7 @@ export default function App() {
   const handleDelete = async (id, e) => {
     e.stopPropagation()
     await deleteSession(id)
-    setSessions(s => s.filter(x => x.session_id !== id))
+    setSessions(s => s.filter(x => x.id !== id))
     if (sessionId === id) newChat()
   }
 
