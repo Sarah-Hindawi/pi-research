@@ -155,7 +155,15 @@ def synthesise_answer(state: AgentState) -> AgentState:
             statutes=formatted,
         )
 
-    history = [m for m in state["messages"] if m.get("role") in ("user", "assistant")]
+    history = []
+    for m in state["messages"]:
+        if isinstance(m, dict):
+            if m.get("role") in ("user", "assistant"):
+                history.append(m)
+        else:
+            # LangGraph HumanMessage / AIMessage objects
+            role = "user" if m.__class__.__name__ == "HumanMessage" else "assistant"
+            history.append({"role": role, "content": m.content})
     messages = history + [{"role": "user", "content": user_content}]
 
     answer = llm.invoke(messages, system=system) if hasattr(llm, "invoke") else llm.invoke(messages)

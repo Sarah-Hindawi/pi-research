@@ -10,8 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from retrieval.vector_store import _get_collection
 from ingestion.state_urls import ALL_STATE_NAMES
-from ingestion.classifier import CONTRIBUTING_FACTORS
-
+from rag.embedding.classifier import CONTRIBUTING_FACTORS
 
 def get_coverage_report() -> dict:
     """

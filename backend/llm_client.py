@@ -10,7 +10,7 @@ settings = get_settings()
 class PlaceholderLLM:
     """Stands in for Claude until API key is provided day-of."""
 
-    def invoke(self, messages: list[dict]) -> str:
+    def invoke(self, messages: list[dict], system: str = "") -> str:
         last = messages[-1].get("content", "") if messages else ""
         return (
             f"[PLACEHOLDER -Claude not yet connected]\n\n"
@@ -19,8 +19,8 @@ class PlaceholderLLM:
             f"this will return a real cited answer."
         )
 
-    async def ainvoke(self, messages: list[dict]) -> str:
-        return self.invoke(messages)
+    async def ainvoke(self, messages: list[dict], system: str = "") -> str:
+        return self.invoke(messages, system)
 
 
 class AnthropicLLM:

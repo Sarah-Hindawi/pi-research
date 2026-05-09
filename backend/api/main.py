@@ -79,8 +79,10 @@ def chat(req: ChatRequest):
     try:
         result = run_agent(query=req.query, history=history)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
+    
     msg_id = add_message(session_id, role="assistant", content=result["answer"], sources=result["sources"])
     return ChatResponse(
         session_id=session_id,
