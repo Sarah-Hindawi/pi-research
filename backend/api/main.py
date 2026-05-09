@@ -1,17 +1,20 @@
 """
-FastAPI backend - main entry point.
-Exposes chat, history, and session endpoints.
+FastAPI backend — statute harvester.
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import sys, os
-
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from config import get_settings
 from db.chat_store import init_db, create_session, add_message, get_history, get_sessions
 from agent.orchestrator import run_agent
+from retrieval.vector_store import (
+    count, list_states, list_factors,
+    search, get_by_factor, get_by_citation,
+)
 
 settings = get_settings()
 
@@ -23,9 +26,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OpenClaw API",
-    description="PI Legal Research - Federal + Ontario",
-    version="0.1.0",
+    title="OpenClaw Harvester API",
+    description="US Vehicle Code Statute Research",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -38,120 +41,130 @@ app.add_middleware(
 )
 
 
-# ── Request / Response models ──────────────────────────────────────────────
+# ── Models ─────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    session_id: str | None = None   # None = start new session
+    session_id: str | None = None
     query: str
 
 
-class Source(BaseModel):
-    case_name: str
-    citation: str
-    url: str
-    year: str | int
-    jurisdiction: str
+class StatuteSource(BaseModel):
+    statute: str
+    state: str
+    section: str
+    contributing_factor: str
+    source_url: str
 
 
 class ChatResponse(BaseModel):
     session_id: str
     message_id: str
     answer: str
-    sources: list[Source]
+    sources: list[StatuteSource]
     intent: str
+    filters: dict
 
 
-class SessionResponse(BaseModel):
-    session_id: str
-    label: str | None
-    created_at: str
-    last_activity: str | None
-
-
-# ── Routes ─────────────────────────────────────────────────────────────────
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "llm_provider": settings.llm_provider}
-
+# ── Chat route ─────────────────────────────────────────────────────────────
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    """
-    Main chat endpoint.
-    - Creates a new session if session_id not provided.
-    - Loads history, runs agent, saves messages, returns answer + sources.
-    """
-    # Session management
     session_id = req.session_id or create_session()
-
-    # Load conversation history for context
     history = [
         {"role": m["role"], "content": m["content"]}
         for m in get_history(session_id)
     ]
-
-    # Save user message
     add_message(session_id, role="user", content=req.query)
-
-    # Run agent
     try:
         result = run_agent(query=req.query, history=history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Save assistant message with sources for audit trail
     msg_id = add_message(
         session_id,
         role="assistant",
         content=result["answer"],
         sources=result["sources"],
     )
-
     return ChatResponse(
         session_id=session_id,
         message_id=msg_id,
         answer=result["answer"],
-        sources=[Source(**s) for s in result["sources"]],
+        sources=[StatuteSource(**s) for s in result["sources"]],
         intent=result["intent"],
+        filters=result["filters"],
     )
 
 
-@app.get("/sessions", response_model=list[SessionResponse])
-def list_sessions():
-    """Return all past sessions for the sidebar history."""
-    return [SessionResponse(**s) for s in get_sessions()]
+# ── Statute-specific routes ────────────────────────────────────────────────
+
+@app.get("/statutes/search")
+def statute_search(
+    q: str,
+    state: str | None = None,
+    factor: str | None = None,
+    n: int = 10,
+):
+    """Direct semantic search — for the eval queries."""
+    results = search(query=q, n_results=n, state=state, contributing_factor=factor)
+    return {"results": results, "count": len(results)}
+
+
+@app.get("/statutes/by-factor")
+def statutes_by_factor(factor: str, state: str | None = None):
+    """Get all statutes for a contributing factor, optionally by state."""
+    results = get_by_factor(contributing_factor=factor, state=state)
+    return {"factor": factor, "state": state, "results": results, "count": len(results)}
+
+
+@app.get("/statutes/by-citation")
+def statute_by_citation(citation: str):
+    """Exact citation lookup e.g. 'Cal. Veh. Code § 22350'"""
+    result = get_by_citation(citation)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Citation not found: {citation}")
+    return result
+
+
+@app.get("/statutes/states")
+def get_states():
+    """List all states in the DB."""
+    return {"states": list_states()}
+
+
+@app.get("/statutes/factors")
+def get_factors():
+    """List all contributing factors in the DB."""
+    return {"factors": list_factors()}
+
+
+# ── Session routes ─────────────────────────────────────────────────────────
+
+@app.get("/sessions")
+def list_sessions_route():
+    return get_sessions()
 
 
 @app.get("/sessions/{session_id}/history")
 def session_history(session_id: str):
-    """Return full message history for a session (audit trail)."""
     messages = get_history(session_id)
     if not messages:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"session_id": session_id, "messages": messages}
 
 
-@app.delete("/sessions/{session_id}")
-def delete_session(session_id: str):
-    """Clear a session from history."""
-    import sqlite3
-    from pathlib import Path
-    Path(settings.sqlite_path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(settings.sqlite_path)
-    conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
-    conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-    conn.commit()
-    conn.close()
-    return {"deleted": session_id}
+# ── Health & stats ─────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "llm_provider": settings.llm_provider}
 
 
 @app.get("/stats")
 def stats():
-    """Quick stats for the UI - cases indexed etc."""
-    from retrieval.vector_store import count
     return {
-        "cases_indexed": count(),
-        "llm_provider": settings.llm_provider,
-        "jurisdictions": ["Ontario", "Federal"],
+        "statutes_indexed": count(),
+        "states":           list_states(),
+        "factors":          list_factors(),
+        "llm_provider":     settings.llm_provider,
     }

@@ -1,109 +1,107 @@
 """
-All prompts used by the system.
+All LLM prompts for the statute harvester.
+Owner: Yingkai
 """
 
-# ystem prompt for the main PI research agent
-AGENT_SYSTEM_PROMPT = """You are pi-research assistant specialising in \
-Canadian personal injury law (Federal courts + Ontario).
+# ── Contributing factor categories ────────────────────────────────────────
+CONTRIBUTING_FACTORS = [
+    "DUI/DWI",
+    "Failure to Maintain Lane",
+    "Failure to Obey Traffic Control Device",
+    "Failure to Use/Activate Horn",
+    "Failure to Yield",
+    "Fleeing a Police Officer",
+    "Fleeing the Scene of a Collision",
+    "Improper Passing",
+    "Improper Stopping",
+    "Improper Turning",
+    "Reckless Driving",
+    "Using a Wireless Telephone/Texting While Driving",
+    "Driving Too Fast For Conditions",
+    "Speeding",
+    "Following Too Closely",
+    "Improper Lane Change",
+    "Other",
+]
 
-Your job is to help PI attorneys answer questions about:
-- Case valuations and verdict amounts
-- Liability and causation standards
-- Expert witness history
-- Statute and threshold analysis (Ontario Insurance Act, Minor Injury Guideline)
-- Settlement intelligence
+# ── System prompt ─────────────────────────────────────────────────────────
+AGENT_SYSTEM_PROMPT = """You are a legal research assistant specialising in US motor \
+vehicle statutes for personal injury attorneys.
 
-Rules you must always follow:
-1. NEVER fabricate cases, citations, or verdict amounts.
-2. Every factual claim must include a source citation (case name + CanLII URL).
-3. If you don't have enough data to answer confidently, say so clearly.
-4. Format answers in plain prose - nobullet overload. Attorneys read fast.
-5. End every answer with a "Sources:" section listing the cases you relied on.
+Your database contains vehicle code statutes from multiple US states, each tagged \
+with a contributing factor category — the type of accident behaviour the statute \
+addresses.
 
-Today's date: {today}
-Jurisdiction focus: Federal + Ontario
+The 17 contributing factor categories are:
+{factors}
+
+Rules:
+1. NEVER fabricate statutes, citations, or section numbers.
+2. Every statute you cite must include its source URL.
+3. When comparing across states, present each state's statute separately.
+4. If a statute is not in the database, say so clearly.
+5. Format citations correctly: e.g. "Cal. Veh. Code § 22350"
 """
 
-# ── Case parser prompt - extracts structured fields from raw case text ─────
-CASE_PARSER_PROMPT = """Extract the following fields from this Canadian PI case opinion.
-Return ONLY valid JSON - no preamble, no markdown fences.
+# ── Statute lookup prompt ─────────────────────────────────────────────────
+STATUTE_LOOKUP_PROMPT = """An attorney is researching vehicle code statutes.
 
-Fields to extract:
-{{
-  "case_name": "string - full style of cause",
-  "citation": "string - CanLII citation if present",
-  "year": "integer",
-  "court": "string",
-  "jurisdiction": "string - province code or 'federal'",
-  "injury_type": "string - e.g. herniated disc, TBI, soft tissue, fracture",
-  "injury_location": "string - e.g. L4/L5, cervical spine",
-  "accident_type": "string - e.g. rear-end MVA, slip and fall",
-  "general_damages": "number or null",
-  "special_damages": "number or null",
-  "total_damages": "number or null",
-  "plaintiff_won": "boolean",
-  "expert_witnesses": ["list of expert witness names mentioned"],
-  "causation_accepted": "boolean or null - did court accept plaintiff's causation argument",
-  "summary": "2-3 sentence plain English summary of the decision"
-}}
+Query: {query}
 
-Case text:
-{case_text}
-"""
+Relevant statutes found:
+{statutes}
 
-# ntario Insurance Act / Minor Injury Guideline statute reasoning
-STATUTE_REASONING_PROMPT = """You are analysing whether a personal injury claim meets \
-Ontario's statutory thresholds.
+Provide a clear, cited answer. For each statute include:
+- Full citation
+- The relevant statutory language
+- Source URL
+- Which contributing factor it addresses
 
-Relevant rules:
-- Minor Injury Guideline (MIG): caps treatment at $3,500 for minor injuries
-  (sprains, strains, whiplash - WAD I/II)
-- Section 267.5 Insurance Act: deductible of $42,049.02 (2024) on general damages
-  unless damages exceed $140,000
-- Catastrophic impairment: removes the cap entirely - requires AMA Guides assessment
+If the attorney asked about a specific state, focus on that state.
+If multi-state, organise by state.
+End with a summary table if there are 3+ statutes."""
 
-Given the following injury facts, reason through:
-1. Does the injury fall within the MIG? Why or why not?
-2. Does the statutory deductible likely apply?
-3. Is catastrophic designation arguable?
-4. What additional evidence would strengthen the plaintiff's position?
+# ── Contributing factor lookup prompt ─────────────────────────────────────
+FACTOR_LOOKUP_PROMPT = """An attorney needs all statutes related to a specific \
+contributing factor across US states.
 
-Injury facts:
-{injury_facts}
+Contributing factor: {contributing_factor}
+States requested: {states}
 
-Relevant cases found:
-{relevant_cases}
-"""
+Statutes found:
+{statutes}
 
-# Verdict valuation prompt
-VALUATION_PROMPT = """Based on the following similar cases, estimate a reasonable \
-verdict range for the plaintiff's claim.
+Present the statutes organised by state. For each:
+- State name as header
+- Citation + section number
+- Key statutory language (one sentence)
+- Source URL
 
-Plaintiff's facts:
-{plaintiff_facts}
+Note any states where coverage is missing."""
 
-Similar cases:
-{similar_cases}
+# ── Cross-state comparison prompt ─────────────────────────────────────────
+COMPARISON_PROMPT = """Compare how different US states address the same traffic \
+violation in their vehicle codes.
 
-Provide:
-1. Low estimate (25th percentile) with reasoning
-2. Median estimate with reasoning
-3. High estimate (75th percentile) with reasoning
-4. Key factors that could push the verdict higher or lower
-5. Whether trial or settlement is recommended based on the data
+Topic: {topic}
+States: {states}
 
-Cite every case you reference.
-"""
+Statutes found:
+{statutes}
 
-# ── Expert witness analysis prompt ────────────────────────────────────────
-EXPERT_WITNESS_PROMPT = """Analyse the expert witness history based on these case excerpts.
+Structure your response as:
+1. Brief overview of how states differ on this issue
+2. State-by-state breakdown with citations
+3. Key differences an attorney should know
+4. Source URLs for each statute"""
 
-Expert name: {expert_name}
-Cases found: {cases}
+# ── General research prompt ────────────────────────────────────────────────
+GENERAL_PROMPT = """You are helping a PI attorney research vehicle code statutes.
 
-Summarise:
-1. How many times has this expert testified for plaintiff vs defence?
-2. Has any court questioned or rejected their testimony? Quote the court's language.
-3. What is their area of specialisation as described by courts?
-4. Overall credibility assessment based on judicial treatment.
-"""
+Question: {query}
+
+Relevant statutes:
+{statutes}
+
+Answer the question directly with citations. Include source URLs.
+If the question cannot be answered from the available statutes, say so."""
