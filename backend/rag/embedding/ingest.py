@@ -20,57 +20,40 @@ def adapt_record(record: dict) -> dict | None:
     """
     Convert one scraped JSON record into ChromaDB format.
 
-    Handles two input shapes:
-      1. Colleague's scraper format (statute_text, contributing_factors as list)
-      2. Seed CSV format (Statute Language, Contributing Factor as string)
+    Input format (new scraper):
+        citation, section_number, statute_language, complete_statute,
+        source_url, contributing_factor (string), state, state_abbrev
     """
-    # Try colleague's scraper format first
-    text = record.get("statute_text", "").strip()
-
-    # Fallback to seed CSV format
-    if not text:
-        text = record.get("Statute Language", "").strip()
+    # New format uses "statute_language" as the text field
+    text = record.get("statute_language", "").strip()
 
     if not text or len(text) < 30:
         return None
 
-    # contributing_factors is a list in scraper format
-    factors = record.get("contributing_factors", [])
-    if isinstance(factors, list):
-        primary_factor = factors[0] if factors else ""
-    else:
-        primary_factor = str(factors)
-
-    # Fallback for seed CSV format
-    if not primary_factor:
-        primary_factor = record.get("Contributing Factor", "")
+    # contributing_factor is already a string in new format
+    primary_factor = record.get("contributing_factor", "").strip()
 
     # Validate against our 17 categories
     if primary_factor and primary_factor not in CONTRIBUTING_FACTORS:
         primary_factor = ""
 
-    # Build unique ID
-    record_id = (
-        record.get("id")
-        or f"{record.get('state_abbrev', 'XX').lower()}-{record.get('section_number', '').replace('.', '').replace('(', '').replace(')', '')}"
-    )
+    # Build unique ID from state_abbrev + section_number
+    state_abbrev = record.get("state_abbrev", "XX")
+    section      = record.get("section_number", "")
+    record_id    = f"{state_abbrev.lower()}-{section.replace('.', '').replace('(', '').replace(')', '').replace(' ', '')}"
 
     return {
         "id":   record_id,
         "text": text,
         "metadata": {
-            "statute":             record.get("citation") or record.get("Statute", ""),
-            "state":               record.get("state") or record.get("State", ""),
-            "universal_citation":  (record.get("citation", "") or "").split("§")[0].strip(),
-            "section":             record.get("section_number") or record.get("Section #", ""),
-            "complete_statute":    record.get("complete_statute") or f"Pursuant to {record.get('citation', '')}, \"{text[:300]}\"",
+            "statute":             record.get("citation", ""),
+            "state":               record.get("state", ""),
+            "universal_citation":  record.get("citation", "").split("§")[0].strip(),
+            "section":             section,
+            "complete_statute":    record.get("complete_statute", ""),
             "contributing_factor": primary_factor,
-            "source_url":          record.get("official_url") or record.get("source_url", ""),
-            "title":               record.get("title", ""),
-            "chapter_name":        record.get("chapter_name", ""),
-            "violation_type":      record.get("violation_type", ""),
-            "severity":            record.get("severity", ""),
-            "state_abbrev":        record.get("state_abbrev", ""),
+            "source_url":          record.get("source_url", ""),
+            "state_abbrev":        state_abbrev,
         },
     }
 
@@ -84,7 +67,12 @@ def ingest(filepath: str, classify_empty: bool = False) -> None:
         classify_empty: if True, auto-classify records missing contributing_factor
     """
     with open(filepath, encoding="utf-8") as f:
-        records = json.load(f)
+        data = json.load(f)
+
+    # Handle wrapper key — file has {"records": [...], "completed": ...}
+    records = data["records"] if isinstance(data, dict) else data
+
+    records = records[:20]
 
     print(f"Loaded {len(records)} records from {filepath}")
 
@@ -102,7 +90,7 @@ def ingest(filepath: str, classify_empty: bool = False) -> None:
         adapted.append(result)
 
     print(f"  Valid:   {len(adapted)}")
-    print(f"  Skipped: {skipped} (no text)")
+    print(f"  Skipped: {skipped} (no text or too short)")
     print(f"  Missing contributing_factor: {needs_classification}")
 
     if classify_empty and needs_classification > 0:
@@ -132,4 +120,9 @@ if __name__ == "__main__":
     parser.add_argument("--classify-empty", action="store_true",
                         help="Auto-classify records missing contributing_factor using Claude")
     args = parser.parse_args()
+
     ingest(filepath=args.file, classify_empty=args.classify_empty)
+
+    # filepath = os.path.join(os.path.dirname(__file__), "..", "..", "data", "statutes.json")
+    # ingest(filepath=filepath, classify_empty=True)
+

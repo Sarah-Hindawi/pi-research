@@ -1,8 +1,5 @@
 """
 classifier.py — Auto-classifies statutes into 17 contributing factor categories.
-
-Moved here from ingestion/ — this is part of your embedding pipeline,
-not the scraping pipeline.
 """
 import json
 import sys
@@ -53,7 +50,7 @@ def classify_statute(statute_text: str) -> dict:
     llm = get_llm()
     prompt = CLASSIFY_PROMPT.format(
         categories="\n".join(f"- {f}" for f in CONTRIBUTING_FACTORS),
-        statute_text=statute_text[:1000],
+        statute_text=statute_text[:5000],
     )
     try:
         response = llm.invoke([{"role": "user", "content": prompt}])
