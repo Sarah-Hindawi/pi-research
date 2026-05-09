@@ -56,13 +56,20 @@ class DimensionScore(BaseModel):
     reasoning: str
 
 
+class SourceScore(BaseModel):
+    statute: str       # e.g. "Cal. Veh. Code § 23152(a)"
+    confidence: int    # 0–100: how certain the judge is this statute applies
+    applies: bool      # true if the statute is supported by the case facts
+
+
 class EvalResult(BaseModel):
     correctness:   DimensionScore
     faithfulness:  DimensionScore
     relevance:     DimensionScore
     completeness:  DimensionScore
     overall_score: float
-    confidence:    float    # how certain the judge is about this evaluation, 0.0 – 1.0
+    confidence:    float          # overall evaluation confidence, 0.0 – 1.0
+    source_scores: list[SourceScore]  # per-statute confidence
     verdict:       Literal["pass", "fail", "partial"]
     summary:       str
 
@@ -86,6 +93,12 @@ Confidence score (0.0 – 1.0):
 - Medium (0.5–0.7): some facts are vague, statutes are borderline applicable, or ground truth is missing.
 - Low (0.0–0.4): case is highly ambiguous, insufficient context to judge reliably.
 
+Per-statute confidence:
+- For each cited source, rate 0–100 how certain you are it applies to the facts.
+- 90–100: statute clearly applies, facts directly establish the violation.
+- 60–89: statute likely applies but facts are incomplete or borderline.
+- 0–59: statute is a stretch given the facts provided.
+
 Return ONLY valid JSON matching this schema exactly:
 {
   "correctness":   { "score": <float>, "reasoning": "<string>" },
@@ -93,6 +106,9 @@ Return ONLY valid JSON matching this schema exactly:
   "relevance":     { "score": <float>, "reasoning": "<string>" },
   "completeness":  { "score": <float>, "reasoning": "<string>" },
   "confidence":    <float>,
+  "source_scores": [
+    { "statute": "<citation>", "confidence": <0-100>, "applies": <true|false> }
+  ],
   "summary": "<one sentence verdict>"
 }
 """
@@ -218,6 +234,15 @@ def evaluate(req: EvalRequest, db=None) -> EvalResult:
     }
     overall = _overall(dim_scores)
 
+    source_scores = [
+        SourceScore(
+            statute=s.get("statute", ""),
+            confidence=int(s.get("confidence", 50)),
+            applies=bool(s.get("applies", True)),
+        )
+        for s in data.get("source_scores", [])
+    ]
+
     return EvalResult(
         correctness=DimensionScore(**data["correctness"]),
         faithfulness=DimensionScore(**data["faithfulness"]),
@@ -225,6 +250,7 @@ def evaluate(req: EvalRequest, db=None) -> EvalResult:
         completeness=DimensionScore(**data["completeness"]),
         overall_score=overall,
         confidence=round(float(data.get("confidence", 0.5)), 2),
+        source_scores=source_scores,
         verdict=_verdict(overall),
         summary=data.get("summary", ""),
     )
@@ -323,4 +349,8 @@ def evaluate_response(
             "verdict":      result.verdict,
             "reasoning":    result.summary,
         },
+        "source_scores": [
+            {"statute": s.statute, "confidence": s.confidence, "applies": s.applies}
+            for s in result.source_scores
+        ],
     }
